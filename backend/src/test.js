@@ -106,3 +106,58 @@ test('jobService - paused queue ignores jobs', () => {
   const claimed = jobService.claimNextJob('worker-1', [queue.id]);
   assert.strictEqual(claimed, null);
 });
+
+test('jobService - sweepOfflineWorkers reschedules job when worker goes silent', () => {
+  db.jobs = [];
+  db.queues = [];
+  db.workers = [];
+  db.job_executions = [];
+  db.retry_policies = [];
+
+  const queue = insert('queues', {
+    id: 'q-test-sweep',
+    name: 'sweep-queue',
+    is_paused: false,
+    concurrency_limit: 5,
+    priority: 1
+  });
+
+  insert('retry_policies', {
+    id: 'p-test-sweep',
+    queue_id: queue.id,
+    strategy: 'fixed',
+    base_delay_ms: 1000,
+    max_retries: 3,
+    max_delay_ms: 10000
+  });
+
+  const worker = insert('workers', {
+    id: 'worker-stale',
+    hostname: 'worker-stale',
+    status: 'online',
+    concurrency: 5,
+    registered_at: new Date(Date.now() - 20000).toISOString(),
+    last_seen_at: new Date(Date.now() - 20000).toISOString(),
+  });
+
+  const job = jobService.createJob(queue, { type: 'immediate', payload: { test: 1 } });
+  
+  // Claim the job so it starts running
+  const claimed = jobService.claimNextJob(worker.id, [queue.id]);
+  assert.ok(claimed);
+  assert.strictEqual(claimed.job.status, 'running');
+
+  // Run sweep -- should mark worker offline and reschedule the job
+  const sweptCount = jobService.sweepOfflineWorkers();
+  assert.strictEqual(sweptCount, 1);
+
+  // Check worker status
+  const updatedWorker = db.workers.find(w => w.id === worker.id);
+  assert.strictEqual(updatedWorker.status, 'offline');
+
+  // Check job status (since retry is scheduled, it should be 'scheduled' with updated run_at and claim cleared)
+  const updatedJob = db.jobs.find(j => j.id === job.id);
+  assert.strictEqual(updatedJob.status, 'scheduled');
+  assert.strictEqual(updatedJob.claimed_by, null);
+  assert.strictEqual(updatedJob.attempt_count, 1);
+});

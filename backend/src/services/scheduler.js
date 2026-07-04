@@ -11,6 +11,11 @@ function start() {
     jobService.promoteDueJobs();
   }, 1000);
 
+  // Every 5 seconds: sweep stale workers and reschedule their running jobs.
+  setInterval(() => {
+    jobService.sweepOfflineWorkers();
+  }, 5000);
+
   // Every minute: check recurring (cron) job definitions and spawn due instances.
   cron.schedule('* * * * * *', () => {
     const recurringDefs = findMany('jobs', (j) => j.type === 'recurring' && j.cron_expression);

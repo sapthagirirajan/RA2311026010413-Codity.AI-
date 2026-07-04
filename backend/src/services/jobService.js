@@ -209,6 +209,54 @@ function promoteDueJobs() {
   return due.length;
 }
 
+/** Find silent workers, mark them offline, and reschedule their running jobs. */
+function sweepOfflineWorkers() {
+  const staleTime = 15000; // 15 seconds
+  const activeWorkers = findMany('workers', (w) => w.status !== 'offline');
+  let sweptCount = 0;
+
+  for (const worker of activeWorkers) {
+    const elapsed = Date.now() - new Date(worker.last_seen_at || worker.registered_at).getTime();
+    if (elapsed > staleTime) {
+      update('workers', worker.id, { status: 'offline' });
+      const runningJobs = findMany('jobs', (j) => j.claimed_by === worker.id && (j.status === 'running' || j.status === 'claimed'));
+      
+      for (const job of runningJobs) {
+        const activeExec = findMany('job_executions', (e) => e.job_id === job.id && e.worker_id === worker.id && e.status === 'running')[0];
+        if (activeExec) {
+          failJob(job.id, activeExec.id, 'Worker heartbeat timeout: worker went offline during execution');
+        } else {
+          // Fallback if no execution is found: just reschedule directly
+          const newAttemptCount = job.attempt_count + 1;
+          if (newAttemptCount >= job.max_retries) {
+            update('jobs', job.id, { status: 'dead_letter', attempt_count: newAttemptCount });
+            insert('dead_letter_queue', {
+              id: newId(),
+              job_id: job.id,
+              queue_id: job.queue_id,
+              final_error: 'Worker went offline (no execution trace)',
+              attempt_count: newAttemptCount,
+              moved_at: now(),
+              payload_snapshot: job.payload,
+            });
+            broadcast({ event: 'job:dead_letter', job: findById('jobs', job.id) });
+          } else {
+            update('jobs', job.id, {
+              status: 'queued',
+              attempt_count: newAttemptCount,
+              claimed_by: null,
+              started_at: null,
+            });
+            broadcast({ event: 'job:queued', job: findById('jobs', job.id) });
+          }
+        }
+      }
+      sweptCount++;
+    }
+  }
+  return sweptCount;
+}
+
 function retryDlqJob(dlqEntryId) {
   const entry = findById('dead_letter_queue', dlqEntryId);
   if (!entry) return null;
@@ -220,5 +268,5 @@ function retryDlqJob(dlqEntryId) {
 
 module.exports = {
   createJob, createBatch, claimNextJob, completeJob, failJob,
-  promoteDueJobs, retryDlqJob, log,
+  promoteDueJobs, sweepOfflineWorkers, retryDlqJob, log,
 };
