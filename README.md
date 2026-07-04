@@ -10,7 +10,7 @@ This system represents a decoupled, multi-process architecture engineered to han
 
 The platform is divided into decoupled layers designed for horizontal scaling. Multiple worker nodes can execute in parallel, polling and claiming tasks independently.
 
-![System Architecture](docs/assets/architecture_diagram.png)
+![System Architecture](docs/assets/architecture-diagram.jpg)
 
 ### Architectural Components
 1. **Express API Server** (`backend/src/server.js`): Coordinates incoming requests, manages user authentication, issues JSON Web Tokens (JWT), registers workers, and handles state operations.
@@ -26,7 +26,7 @@ The platform is divided into decoupled layers designed for horizontal scaling. M
 ### 1. Robust Job State Machine & Lifecycle
 Jobs transition through a strictly guarded state machine, providing auditability and fault isolation at every step.
 
-![Job Lifecycle Cycle](docs/assets/job_state_lifecycle.png)
+![Job Lifecycle Cycle](docs/assets/Flow.png)
 
 - **Immediate**: Executes as soon as workers become available.
 - **Delayed & Scheduled**: Configured with a `run_at` ISO timestamp. Held in `scheduled` status and promoted to `queued` by the scheduler when due.
