@@ -1,0 +1,1310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Pulse — Distributed Job Scheduler Console</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Chart.js CDN for visualizations -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  :root {
+    --bg: #07090E;
+    --panel: rgba(16, 20, 28, 0.75);
+    --panel-solid: #11141D;
+    --panel-2: #161B26;
+    --border: rgba(255, 255, 255, 0.06);
+    --border-hover: rgba(0, 245, 212, 0.25);
+    --text: #F3F4F6;
+    --muted: #9CA3AF;
+    --muted-2: #4B5563;
+    --cyan: #00F5D4;
+    --amber: #FFB703;
+    --red: #FF3F6C;
+    --green: #00F59B;
+    --violet: #8C7BFF;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'Inter', sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: radial-gradient(circle at 10% 10%, rgba(123, 44, 191, 0.08), transparent 35%),
+                radial-gradient(circle at 90% 90%, rgba(0, 245, 212, 0.06), transparent 35%),
+                var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+  }
+  
+  /* Scrollbars */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--panel-2); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted-2); }
+
+  ::selection { background: var(--cyan); color: #000; }
+  a { color: inherit; }
+  .hidden { display: none !important; }
+
+  /* Glassmorphism utility */
+  .glass {
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+  }
+
+  /* Buttons */
+  .btn {
+    cursor: pointer;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-weight: 600;
+    font-size: 13px;
+    font-family: var(--sans);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    background: var(--panel-2);
+    color: var(--text);
+  }
+  .btn:hover {
+    border-color: var(--cyan);
+    color: var(--cyan);
+    box-shadow: 0 0 10px rgba(0, 245, 212, 0.1);
+  }
+  .btn-primary {
+    background: var(--cyan);
+    color: #04231C;
+    border-color: var(--cyan);
+  }
+  .btn-primary:hover {
+    background: #00d9bc;
+    color: #04231C;
+    box-shadow: 0 0 15px rgba(0, 245, 212, 0.35);
+  }
+  .btn-ghost {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover {
+    background: rgba(255, 255, 255, 0.03);
+    color: #fff;
+  }
+
+  /* Auth screen */
+  #auth {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at 30% 20%, rgba(0, 245, 212, 0.08), transparent 45%),
+                radial-gradient(circle at 70% 80%, rgba(140, 123, 255, 0.09), transparent 45%),
+                var(--bg);
+  }
+  .auth-card {
+    width: 400px;
+    background: var(--panel);
+    border-radius: 16px;
+    padding: 40px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 30px;
+  }
+  .brand-mark {
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+    background: var(--cyan);
+    box-shadow: 0 0 12px var(--cyan);
+  }
+  .brand-name {
+    font-family: var(--mono);
+    font-weight: 700;
+    font-size: 20px;
+    letter-spacing: 0.5px;
+  }
+  .brand-sub {
+    color: var(--muted);
+    font-size: 11px;
+    font-family: var(--mono);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .field {
+    margin-bottom: 16px;
+  }
+  .field label {
+    display: block;
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 6px;
+    font-family: var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .field input {
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 10px 14px;
+    font-family: var(--sans);
+    font-size: 14px;
+    outline: none;
+    transition: all 0.2s;
+  }
+  .field input:focus {
+    border-color: var(--cyan);
+    box-shadow: 0 0 8px rgba(0, 245, 212, 0.15);
+  }
+  .switch-mode {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 12px;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .switch-mode span {
+    color: var(--cyan);
+  }
+  .auth-error {
+    background: rgba(255, 63, 108, 0.1);
+    border: 1px solid rgba(255, 63, 108, 0.25);
+    color: var(--red);
+    font-size: 12.5px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    margin-bottom: 16px;
+    font-family: var(--mono);
+  }
+
+  /* App shell */
+  #app {
+    display: grid;
+    grid-template-columns: 240px 1fr 320px;
+    grid-template-rows: 64px 1fr;
+    height: 100vh;
+  }
+  header {
+    grid-column: 1/4;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    background: var(--panel-solid);
+    z-index: 10;
+  }
+  .conn-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--muted-2);
+    display: inline-block;
+    margin-right: 6px;
+  }
+  .conn-dot.live {
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+  }
+  #topmeta {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  nav {
+    border-right: 1px solid var(--border);
+    background: var(--panel-solid);
+    padding: 20px 14px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .nav-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted-2);
+    margin: 16px 8px 6px;
+  }
+  .nav-item {
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 13.5px;
+    cursor: pointer;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: all 0.2s;
+    border: 1px solid transparent;
+  }
+  .nav-item:hover {
+    background: var(--panel-2);
+    color: var(--text);
+  }
+  .nav-item.active {
+    background: linear-gradient(90deg, rgba(0, 245, 212, 0.08) 0%, rgba(123, 44, 191, 0.04) 100%);
+    border: 1px solid rgba(0, 245, 212, 0.15);
+    border-left: 3px solid var(--cyan);
+    color: #fff;
+    font-weight: 500;
+  }
+  .nav-item .badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 2px 6px;
+    border-radius: 10px;
+    color: var(--muted);
+  }
+  .new-btn {
+    width: 100%;
+    margin-top: 4px;
+    background: transparent;
+    border: 1px dashed var(--border);
+    color: var(--muted);
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: var(--mono);
+    transition: all 0.2s;
+  }
+  .new-btn:hover {
+    border-color: var(--cyan);
+    color: var(--cyan);
+    background: rgba(0, 245, 212, 0.02);
+  }
+
+  main {
+    overflow-y: auto;
+    padding: 24px;
+  }
+  .grid-cards {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .card {
+    background: var(--panel);
+    border-radius: 12px;
+    padding: 16px 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 2px;
+    background: transparent;
+    transition: background 0.3s;
+  }
+  .card.cyan::before { background: var(--cyan); }
+  .card.amber::before { background: var(--amber); }
+  .card.red::before { background: var(--red); }
+  .card.green::before { background: var(--green); }
+  
+  .card .label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted-2);
+  }
+  .card .value {
+    font-family: var(--mono);
+    font-size: 28px;
+    font-weight: 700;
+    margin-top: 6px;
+  }
+  .card .value.cyan { color: var(--cyan); text-shadow: 0 0 10px rgba(0, 245, 212, 0.1); }
+  .card .value.amber { color: var(--amber); text-shadow: 0 0 10px rgba(255, 183, 3, 0.1); }
+  .card .value.red { color: var(--red); text-shadow: 0 0 10px rgba(255, 63, 108, 0.1); }
+  .card .value.green { color: var(--green); text-shadow: 0 0 10px rgba(0, 245, 155, 0.1); }
+
+  .panel-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 28px 0 12px;
+  }
+  .panel-title h2 {
+    font-size: 13px;
+    margin: 0;
+    font-family: var(--mono);
+    letter-spacing: 1px;
+    color: var(--muted);
+  }
+  .panel-title .sub {
+    color: var(--muted-2);
+    font-size: 11px;
+    font-family: var(--mono);
+  }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: var(--panel);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 24px;
+    border: 1px solid var(--border);
+  }
+  th {
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted-2);
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.01);
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 12px 16px;
+    font-size: 13px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    transition: background 0.15s;
+  }
+  tr:last-child td { border-bottom: none; }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover td {
+    background: rgba(255, 255, 255, 0.02) !important;
+  }
+  
+  .mono { font-family: var(--mono); }
+  .pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+  }
+  .pill.queued { background: rgba(156, 163, 175, 0.12); color: var(--muted); }
+  .pill.scheduled { background: rgba(140, 123, 255, 0.12); color: var(--violet); }
+  .pill.claimed, .pill.running { background: rgba(0, 245, 212, 0.12); color: var(--cyan); }
+  .pill.completed { background: rgba(0, 245, 155, 0.12); color: var(--green); }
+  .pill.dead_letter { background: rgba(255, 63, 108, 0.12); color: var(--red); }
+
+  .filter-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 14px;
+    align-items: center;
+  }
+  .filter-row select, .filter-row input {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-family: var(--sans);
+    outline: none;
+    transition: all 0.2s;
+  }
+  .filter-row select:focus, .filter-row input:focus {
+    border-color: var(--cyan);
+  }
+  
+  .action-link {
+    color: var(--cyan);
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    transition: all 0.2s;
+  }
+  .action-link:hover {
+    text-shadow: 0 0 8px rgba(0, 245, 212, 0.3);
+    text-decoration: underline;
+  }
+  .action-link.danger { color: var(--red); }
+  .action-link.danger:hover { text-shadow: 0 0 8px rgba(255, 63, 108, 0.3); }
+
+  aside {
+    border-left: 1px solid var(--border);
+    background: var(--panel-solid);
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .feed-item {
+    border-left: 2px solid var(--border);
+    padding: 8px 0 8px 12px;
+    margin-bottom: 4px;
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--muted);
+    transition: all 0.2s;
+  }
+  .feed-item .ev { color: var(--text); font-weight: 500; }
+  .feed-item.job\:completed { border-color: var(--green); }
+  .feed-item.job\:dead_letter { border-color: var(--red); }
+  .feed-item.job\:retry_scheduled { border-color: var(--amber); }
+  .feed-item.job\:claimed { border-color: var(--cyan); }
+  .feed-item.job\:created { border-color: var(--violet); }
+  
+  .worker-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12.5px;
+  }
+  .worker-row:last-child { border-bottom: none; }
+  .worker-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    display: inline-block;
+    margin-right: 8px;
+    box-shadow: 0 0 8px var(--green);
+  }
+  .worker-dot.offline {
+    background: var(--muted-2);
+    box-shadow: none;
+  }
+
+  /* Modals */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(5, 7, 10, 0.85);
+    backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    overflow-y: auto;
+    padding: 20px;
+  }
+  .modal {
+    width: 480px;
+    max-width: 100%;
+    background: var(--panel-solid);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 30px;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.6);
+    position: relative;
+  }
+  .modal.wide {
+    width: 860px;
+  }
+  .modal h3 {
+    margin: 0 0 20px;
+    font-family: var(--mono);
+    font-size: 16px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .modal-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 24px;
+    justify-content: flex-end;
+  }
+  select.field-select {
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 10px 12px;
+    font-size: 14px;
+    outline: none;
+  }
+  textarea.field-ta {
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 10px 12px;
+    font-family: var(--mono);
+    font-size: 12px;
+    min-height: 80px;
+    outline: none;
+    resize: vertical;
+  }
+  textarea.field-ta:focus, select.field-select:focus {
+    border-color: var(--cyan);
+  }
+  .empty {
+    color: var(--muted-2);
+    font-family: var(--mono);
+    font-size: 12.5px;
+    padding: 24px;
+    text-align: center;
+  }
+
+  /* Code boxes */
+  .mono-code {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: var(--mono);
+    color: var(--cyan);
+    font-size: 11.5px;
+  }
+  .json-code {
+    background: #090B0E;
+    border: 1px solid var(--border);
+    padding: 12px;
+    border-radius: 8px;
+    font-family: var(--mono);
+    color: #E2E8F0;
+    font-size: 12px;
+    max-height: 220px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin: 0;
+  }
+  .console-box {
+    background: #050608;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    font-family: var(--mono);
+    font-size: 11px;
+    max-height: 160px;
+    overflow-y: auto;
+    color: #A7F3D0;
+  }
+  .console-line {
+    margin-bottom: 4px;
+    line-height: 1.4;
+  }
+  .console-line.error { color: var(--red); }
+  .console-line.warn { color: var(--amber); }
+  
+  /* AI box */
+  .ai-box {
+    background: linear-gradient(135deg, rgba(140, 123, 255, 0.15) 0%, rgba(0, 245, 212, 0.05) 100%);
+    border: 1px solid rgba(140, 123, 255, 0.25);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body class="glass">
+
+<!-- ============== AUTH SCREEN ============== -->
+<div id="auth">
+  <div class="auth-card glass">
+    <div class="brand"><div class="brand-mark"></div><div><div class="brand-name">PULSE</div><div class="brand-sub">Distributed Job Scheduler</div></div></div>
+    <div id="authError" class="auth-error hidden"></div>
+    <div id="orgField" class="field"><label>Organization name</label><input id="orgName" placeholder="Codity.AI"/></div>
+    <div class="field"><label>Email</label><input id="email" placeholder="you@company.com"/></div>
+    <div class="field"><label>Password</label><input id="password" type="password" placeholder="••••••••"/></div>
+    <button class="btn btn-primary" id="submitAuth" style="width: 100%; margin-top: 8px; padding: 11px;">Create account</button>
+    <div class="switch-mode" id="switchMode">Already have an account? <span>Sign in</span></div>
+  </div>
+</div>
+
+<!-- ============== APP SHELL ============== -->
+<div id="app" class="hidden">
+  <header>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div class="brand-mark"></div><div class="brand-name" style="letter-spacing:0.5px;">PULSE</div>
+    </div>
+    <div id="topmeta">
+      <span><span id="connDot" class="conn-dot"></span>Live feed</span>
+      <span id="userEmail" style="font-weight: 500;"></span>
+      <span class="action-link" id="logoutBtn">Sign out</span>
+    </div>
+  </header>
+
+  <nav>
+    <div class="nav-label">Projects</div>
+    <div id="projectList" style="display:flex; flex-direction:column; gap:4px;"></div>
+    <button class="new-btn" id="newProjectBtn">+ New project</button>
+
+    <div class="nav-label">Queues</div>
+    <div id="queueList" style="display:flex; flex-direction:column; gap:4px;"></div>
+    <button class="new-btn" id="newQueueBtn">+ New queue</button>
+  </nav>
+
+  <main>
+    <div class="grid-cards" id="metricCards"></div>
+    
+    <!-- Analytics charts panel -->
+    <div class="analytics-section" style="display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 24px;">
+      <div class="card glass" style="position: relative; height: 250px; display: flex; flex-direction: column;">
+        <div class="label" style="margin-bottom: 12px;">Throughput Trends (Last 24h)</div>
+        <div style="flex: 1; min-height: 0;"><canvas id="throughputChart"></canvas></div>
+      </div>
+      <div class="card glass" style="position: relative; height: 250px; display: flex; flex-direction: column;">
+        <div class="label" style="margin-bottom: 12px;">Job Distribution</div>
+        <div style="flex: 1; min-height: 0; display: flex; justify-content: center; align-items: center;"><canvas id="distributionChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="panel-title">
+      <h2>JOB EXPLORER</h2>
+      <span class="sub" id="queueSub"></span>
+    </div>
+    
+    <!-- Queue configuration summary line -->
+    <div id="queueConfigSummary" style="margin-bottom: 14px; font-family: var(--mono); font-size: 11.5px; color: var(--muted); display: flex; gap: 20px; flex-wrap: wrap;"></div>
+
+    <div class="filter-row">
+      <select id="statusFilter"><option value="">All statuses</option><option>queued</option><option>scheduled</option><option>running</option><option>completed</option><option>dead_letter</option></select>
+      <select id="typeFilter"><option value="">All types</option><option>immediate</option><option>delayed</option><option>scheduled</option><option>recurring</option><option>batch</option></select>
+      
+      <button class="btn btn-ghost" id="createJobBtn" style="margin-left:auto;">+ Create job</button>
+      <button class="btn btn-ghost" id="configureQueueBtn">⚙ Configure queue</button>
+      <button class="btn btn-ghost" id="pauseQueueBtn">Pause queue</button>
+    </div>
+    
+    <table id="jobsTable">
+      <thead><tr><th>ID</th><th>Type</th><th>Status</th><th>Attempts</th><th>Priority</th><th>Created</th><th style="text-align: right;">Action</th></tr></thead>
+      <tbody id="jobsBody"><tr><td colspan="7" class="empty">Select a queue to view jobs</td></tr></tbody>
+    </table>
+
+    <div class="panel-title"><h2>DEAD LETTER QUEUE</h2></div>
+    <table id="dlqTable">
+      <thead><tr><th>Job ID</th><th>Attempts</th><th>Final error</th><th>Moved at</th><th style="text-align: right;">Action</th></tr></thead>
+      <tbody id="dlqBody"><tr><td colspan="5" class="empty">No dead-lettered jobs</td></tr></tbody>
+    </table>
+  </main>
+
+  <aside>
+    <div class="panel-title" style="margin-top:0;"><h2>WORKERS</h2></div>
+    <div id="workerList" style="display:flex; flex-direction:column; gap:4px;"><div class="empty">No workers registered</div></div>
+
+    <div class="panel-title"><h2>LIVE ACTIVITY</h2></div>
+    <div id="feed" style="max-height: 400px; overflow-y: auto; display:flex; flex-direction:column;"></div>
+  </aside>
+</div>
+
+<!-- ============== MODALS ============== -->
+<div id="modalRoot"></div>
+
+<script>
+const API = 'http://localhost:4000/api';
+const WS_URL = 'ws://localhost:4000/ws';
+let state = {
+  token: localStorage.getItem('pulse_token') || null,
+  user: JSON.parse(localStorage.getItem('pulse_user') || 'null'),
+  projects: [], queues: [], currentProjectId: null, currentQueueId: null,
+  authMode: 'register',
+};
+
+let throughputChartInstance = null;
+let distributionChartInstance = null;
+
+function headers(){ return { 'Content-Type':'application/json', 'Authorization': 'Bearer ' + state.token }; }
+async function api(path, opts={}){
+  const res = await fetch(API+path, { method:opts.method||'GET', headers: headers(), body: opts.body?JSON.stringify(opts.body):undefined });
+  if(res.status===204) return null;
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data.error || ('HTTP '+res.status));
+  return data;
+}
+
+// Simple Markdown parser for AI Summary
+function parseMarkdown(md) {
+  if (!md) return '';
+  return md
+    .replace(/### (.*)/g, '<h4 style="margin: 12px 0 6px; font-family: var(--mono); color: var(--cyan);">$1</h4>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/`(.*?)`/g, '<code class="mono-code">$1</code>')
+    .replace(/\n- (.*)/g, '<br/>• $1')
+    .replace(/\n\d+\. (.*)/g, '<br/>• $1')
+    .replace(/\n/g, '<br/>');
+}
+
+// ---------------- AUTH ----------------
+const authError = document.getElementById('authError');
+document.getElementById('switchMode').onclick = () => {
+  state.authMode = state.authMode==='register' ? 'login' : 'register';
+  document.getElementById('orgField').classList.toggle('hidden', state.authMode==='login');
+  document.getElementById('submitAuth').textContent = state.authMode==='register' ? 'Create account' : 'Sign in';
+  document.getElementById('switchMode').innerHTML = state.authMode==='register'
+    ? 'Already have an account? <span>Sign in</span>' : "New here? <span>Create an account</span>";
+};
+document.getElementById('submitAuth').onclick = async () => {
+  authError.classList.add('hidden');
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const organization_name = document.getElementById('orgName').value.trim();
+  try{
+    const path = state.authMode==='register' ? '/auth/register' : '/auth/login';
+    const body = state.authMode==='register' ? {email,password,organization_name} : {email,password};
+    const res = await fetch(API+path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error||'Failed');
+    state.token = data.token; state.user = data.user;
+    localStorage.setItem('pulse_token', state.token);
+    localStorage.setItem('pulse_user', JSON.stringify(state.user));
+    boot();
+  }catch(err){ authError.textContent = err.message; authError.classList.remove('hidden'); }
+};
+document.getElementById('logoutBtn').onclick = () => {
+  localStorage.clear(); location.reload();
+};
+
+// ---------------- MODALS ----------------
+function openModal(html, isWide = false){
+  document.getElementById('modalRoot').innerHTML = `<div class="modal-backdrop" id="mb"><div class="modal glass ${isWide ? 'wide' : ''}">${html}</div></div>`;
+  document.getElementById('mb').addEventListener('click', (e)=>{ if(e.target.id==='mb') closeModal(); });
+}
+function closeModal(){ document.getElementById('modalRoot').innerHTML=''; }
+
+document.getElementById('newProjectBtn').onclick = () => {
+  openModal(`<h3>New project</h3>
+    <div class="field"><label>Project name</label><input id="mProjName" placeholder="Payments Service"/></div>
+    <div class="modal-actions"><button class="btn btn-primary" id="mProjSave">Create</button><button class="btn btn-ghost" onclick="closeModal()">Cancel</button></div>`);
+  document.getElementById('mProjSave').onclick = async () => {
+    const name = document.getElementById('mProjName').value.trim();
+    if(!name) return;
+    await api('/projects', {method:'POST', body:{name}});
+    closeModal(); await loadProjects();
+  };
+};
+
+document.getElementById('newQueueBtn').onclick = () => {
+  if(!state.currentProjectId){ alert('Select or create a project first'); return; }
+  openModal(`<h3>New queue</h3>
+    <div class="field"><label>Queue name</label><input id="mQName" placeholder="emails"/></div>
+    <div class="field"><label>Priority (0-10)</label><input id="mQPriority" value="0"/></div>
+    <div class="field"><label>Concurrency limit</label><input id="mQConc" value="5"/></div>
+    <div class="field"><label>Retry strategy</label>
+      <select id="mQStrategy" class="field-select"><option value="exponential">Exponential backoff</option><option value="linear">Linear backoff</option><option value="fixed">Fixed delay</option></select>
+    </div>
+    <div class="modal-actions"><button class="btn btn-primary" id="mQSave">Create</button><button class="btn btn-ghost" onclick="closeModal()">Cancel</button></div>`);
+  document.getElementById('mQSave').onclick = async () => {
+    const name = document.getElementById('mQName').value.trim();
+    if(!name) return;
+    await api(`/projects/${state.currentProjectId}/queues`, {method:'POST', body:{
+      name, priority:Number(document.getElementById('mQPriority').value)||0,
+      concurrency_limit:Number(document.getElementById('mQConc').value)||5,
+      retry_policy:{ strategy: document.getElementById('mQStrategy').value, base_delay_ms:1000, max_retries:3 }
+    }});
+    closeModal(); await loadQueues();
+  };
+};
+
+document.getElementById('configureQueueBtn').onclick = () => {
+  if(!state.currentQueueId){ alert('Select a queue first'); return; }
+  const q = state.queues.find(queue => queue.id === state.currentQueueId);
+  if (!q) return;
+  const rp = q.retry_policy || { strategy: 'exponential', base_delay_ms: 1000, max_retries: 3 };
+  
+  openModal(`<h3>Configure Queue: ${q.name}</h3>
+    <div class="field"><label>Queue Name</label><input id="editQName" value="${q.name || ''}"/></div>
+    <div class="field"><label>Priority (0-10)</label><input id="editQPriority" value="${q.priority ?? 0}"/></div>
+    <div class="field"><label>Concurrency Limit</label><input id="editQConc" value="${q.concurrency_limit ?? 5}"/></div>
+    <div class="field"><label>Rate Limit (jobs/min, leave empty for unlimited)</label><input id="editQRate" value="${q.rate_limit_per_min || ''}" placeholder="e.g. 60"/></div>
+    
+    <div style="border-top: 1px solid var(--border); margin: 15px 0; padding-top: 12px;">
+      <h4 style="margin: 0 0 10px; font-size: 11px; font-family: var(--mono); color: var(--cyan); text-transform: uppercase;">Retry Policy</h4>
+      <div class="field"><label>Strategy</label>
+        <select id="editQStrategy" class="field-select">
+          <option value="exponential" ${rp.strategy === 'exponential' ? 'selected' : ''}>Exponential backoff</option>
+          <option value="linear" ${rp.strategy === 'linear' ? 'selected' : ''}>Linear backoff</option>
+          <option value="fixed" ${rp.strategy === 'fixed' ? 'selected' : ''}>Fixed delay</option>
+        </select>
+      </div>
+      <div class="field"><label>Max Retries</label><input id="editQMaxRetries" value="${rp.max_retries ?? 3}"/></div>
+      <div class="field"><label>Base Delay (ms)</label><input id="editQBaseDelay" value="${rp.base_delay_ms ?? 1000}"/></div>
+    </div>
+    
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="editQSave">Save Settings</button>
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+    </div>`);
+    
+  document.getElementById('editQSave').onclick = async () => {
+    const name = document.getElementById('editQName').value.trim();
+    if (!name) return alert('Name is required');
+    const priority = Number(document.getElementById('editQPriority').value) || 0;
+    const concurrency_limit = Number(document.getElementById('editQConc').value) || 5;
+    const rateLimitInput = document.getElementById('editQRate').value.trim();
+    const rate_limit_per_min = rateLimitInput ? Number(rateLimitInput) : null;
+    const strategy = document.getElementById('editQStrategy').value;
+    const max_retries = Number(document.getElementById('editQMaxRetries').value) || 3;
+    const base_delay_ms = Number(document.getElementById('editQBaseDelay').value) || 1000;
+    
+    try {
+      await api(`/queues/${q.id}`, {
+        method: 'PATCH',
+        body: {
+          name, priority, concurrency_limit, rate_limit_per_min,
+          retry_policy: { strategy, max_retries, base_delay_ms }
+        }
+      });
+      closeModal();
+      await loadQueues();
+    } catch(err) {
+      alert(err.message);
+    }
+  };
+};
+
+document.getElementById('createJobBtn').onclick = () => {
+  if(!state.currentQueueId){ alert('Select a queue first'); return; }
+  openModal(`<h3>Create job</h3>
+    <div class="field"><label>Type</label>
+      <select id="mJType" class="field-select">
+        <option value="immediate">Immediate</option>
+        <option value="delayed">Delayed</option>
+        <option value="scheduled">Scheduled</option>
+        <option value="recurring">Recurring (cron)</option>
+        <option value="batch">Batch (Multiple Jobs)</option>
+      </select>
+    </div>
+    <div class="field" id="mJRunAtField"><label>Run at (ISO datetime, for delayed/scheduled)</label><input id="mJRunAt" placeholder="2026-07-05T10:00:00.000Z"/></div>
+    <div class="field" id="mJCronField" style="display:none;"><label>Cron expression</label><input id="mJCron" placeholder="*/5 * * * *"/></div>
+    
+    <div class="field" id="mJBatchField" style="display:none;">
+      <label>Batch Job Specifications (JSON Array of Objects)</label>
+      <textarea id="mJBatchJobs" class="field-ta" style="min-height: 120px;">[
+  { "payload": { "task": "email", "recipient": "user1@company.com" } },
+  { "payload": { "task": "email", "recipient": "user2@company.com" } }
+]</textarea>
+    </div>
+    
+    <div class="field" id="mJPayloadField"><label>Payload (JSON)</label><textarea id="mJPayload" class="field-ta">{"example":"value"}</textarea></div>
+    <div class="field"><label>Priority (0-10)</label><input id="mJPriority" value="0"/></div>
+    <div class="field"><label>Max Retries</label><input id="mJMaxRetries" value="3"/></div>
+    
+    <div class="modal-actions"><button class="btn btn-primary" id="mJSave">Create</button><button class="btn btn-ghost" onclick="closeModal()">Cancel</button></div>`);
+    
+  document.getElementById('mJType').onchange = (e) => {
+    const type = e.target.value;
+    document.getElementById('mJRunAtField').style.display = (type==='delayed' || type==='scheduled') ? 'block':'none';
+    document.getElementById('mJCronField').style.display = type==='recurring' ? 'block':'none';
+    document.getElementById('mJBatchField').style.display = type==='batch' ? 'block':'none';
+    document.getElementById('mJPayloadField').style.display = type==='batch' ? 'none':'block';
+  };
+  
+  document.getElementById('mJSave').onclick = async () => {
+    const type = document.getElementById('mJType').value;
+    const priority = Number(document.getElementById('mJPriority').value) || 0;
+    const max_retries = Number(document.getElementById('mJMaxRetries').value) || 3;
+    let bodyData = { type, priority, max_retries };
+    
+    if (type === 'batch') {
+      let specs = [];
+      try {
+        specs = JSON.parse(document.getElementById('mJBatchJobs').value || '[]');
+      } catch {
+        alert('Invalid JSON array for Batch Job Specifications');
+        return;
+      }
+      if (!Array.isArray(specs)) {
+        alert('Batch job specification must be a JSON Array');
+        return;
+      }
+      bodyData.jobs = specs;
+    } else {
+      let payload = {};
+      try { payload = JSON.parse(document.getElementById('mJPayload').value||'{}'); }catch{ alert('Invalid JSON payload'); return; }
+      bodyData.payload = payload;
+      bodyData.run_at = document.getElementById('mJRunAt').value || undefined;
+      bodyData.cron_expression = document.getElementById('mJCron').value || undefined;
+    }
+    
+    try{
+      await api(`/queues/${state.currentQueueId}/jobs`, {method:'POST', body: bodyData});
+      closeModal(); await refreshCurrentQueue();
+    }catch(err){ alert(err.message); }
+  };
+};
+
+document.getElementById('pauseQueueBtn').onclick = async () => {
+  if(!state.currentQueueId) return;
+  const q = state.queues.find(q=>q.id===state.currentQueueId);
+  await api(`/queues/${state.currentQueueId}/${q.is_paused?'resume':'pause'}`, {method:'POST'});
+  await loadQueues();
+};
+
+window.inspectJob = async (jobId) => {
+  try {
+    const job = await api(`/jobs/${jobId}`);
+    
+    let logsHtml = '<div class="empty">No log records for this job</div>';
+    if (job.logs && job.logs.length > 0) {
+      logsHtml = `<div class="console-box">` + job.logs.map(l => {
+        const time = new Date(l.created_at).toLocaleTimeString();
+        const levelClass = l.level === 'error' ? 'error' : (l.level === 'warn' ? 'warn' : '');
+        return `<div class="console-line ${levelClass}">[${time}] [${l.level.toUpperCase()}] ${l.message}</div>`;
+      }).join('') + `</div>`;
+    }
+    
+    let executionsHtml = '<div class="empty">No executions recorded yet</div>';
+    if (job.executions && job.executions.length > 0) {
+      executionsHtml = `<table>
+        <thead>
+          <tr>
+            <th>Attempt</th>
+            <th>Worker ID</th>
+            <th>Status</th>
+            <th>Duration</th>
+            <th>Finished At</th>
+            <th>Result/Error</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${job.executions.map(e => `
+            <tr>
+              <td class="mono">${e.attempt_number}</td>
+              <td class="mono">${e.worker_id ? e.worker_id.slice(0, 8) : 'N/A'}</td>
+              <td><span class="pill ${e.status === 'failed' ? 'dead_letter' : (e.status === 'completed' ? 'completed' : 'claimed')}">${e.status}</span></td>
+              <td class="mono">${e.duration_ms ? e.duration_ms + 'ms' : 'in flight'}</td>
+              <td class="mono">${e.finished_at ? new Date(e.finished_at).toLocaleTimeString() : '—'}</td>
+              <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${e.status === 'failed' ? e.error_message : JSON.stringify(e.result || '')}">
+                ${e.status === 'failed' ? e.error_message : JSON.stringify(e.result || '')}
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`;
+    }
+    
+    let aiDiagnosisHtml = '';
+    if (job.ai_failure_summary) {
+      aiDiagnosisHtml = `
+        <div class="ai-box">
+          ${parseMarkdown(job.ai_failure_summary)}
+        </div>
+      `;
+    }
+
+    const modalHtml = `
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
+        <h3 style="margin:0;">Job Inspection: <span class="mono" style="color:var(--cyan);">${job.id}</span></h3>
+        <span class="pill ${job.status}">${job.status}</span>
+      </div>
+      
+      ${aiDiagnosisHtml}
+      
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+        <div>
+          <h4 style="margin: 0 0 8px; font-size: 11px; font-family: var(--mono); color: var(--muted-2); text-transform: uppercase;">Job Metadata</h4>
+          <table style="width:100%; border:none; background:transparent;">
+            <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 6px 0; color:var(--muted);">Type</td><td class="mono" style="text-align:right;">${job.type}</td></tr>
+            <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 6px 0; color:var(--muted);">Attempts</td><td class="mono" style="text-align:right;">${job.attempt_count} / ${job.max_retries}</td></tr>
+            <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 6px 0; color:var(--muted);">Priority</td><td class="mono" style="text-align:right;">${job.priority}</td></tr>
+            <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 6px 0; color:var(--muted);">Created At</td><td class="mono" style="text-align:right;">${new Date(job.created_at).toLocaleString()}</td></tr>
+            ${job.run_at ? `<tr style="border-bottom: 1px solid var(--border);"><td style="padding: 6px 0; color:var(--muted);">Run At</td><td class="mono" style="text-align:right;">${new Date(job.run_at).toLocaleString()}</td></tr>` : ''}
+            ${job.cron_expression ? `<tr style="border-bottom: 1px solid var(--border);"><td style="padding: 6px 0; color:var(--muted);">Cron Expression</td><td class="mono" style="text-align:right;">${job.cron_expression}</td></tr>` : ''}
+            ${job.batch_id ? `<tr style="border-bottom: 1px solid var(--border);"><td style="padding: 6px 0; color:var(--muted);">Batch ID</td><td class="mono" style="text-align:right;">${job.batch_id.slice(0, 8)}...</td></tr>` : ''}
+          </table>
+        </div>
+        <div>
+          <h4 style="margin: 0 0 8px; font-size: 11px; font-family: var(--mono); color: var(--muted-2); text-transform: uppercase;">JSON Payload</h4>
+          <pre class="json-code">${JSON.stringify(job.payload, null, 2)}</pre>
+        </div>
+      </div>
+      
+      <div style="margin-bottom: 20px;">
+        <h4 style="margin: 0 0 8px; font-size: 11px; font-family: var(--mono); color: var(--muted-2); text-transform: uppercase;">Execution Attempts</h4>
+        ${executionsHtml}
+      </div>
+      
+      <div style="margin-bottom: 20px;">
+        <h4 style="margin: 0 0 8px; font-size: 11px; font-family: var(--mono); color: var(--muted-2); text-transform: uppercase;">Execution Logs Console</h4>
+        ${logsHtml}
+      </div>
+      
+      <div class="modal-actions">
+        <button class="btn btn-primary" onclick="closeModal()" style="width:auto; margin-left:auto; padding: 10px 24px;">Close</button>
+      </div>
+    `;
+    
+    openModal(modalHtml, true);
+  } catch(err) {
+    alert('Failed to load job details: ' + err.message);
+  }
+};
+
+// ---------------- DATA LOADING ----------------
+async function loadProjects(){
+  const res = await api('/projects');
+  state.projects = res.data;
+  if(!state.currentProjectId && state.projects[0]) state.currentProjectId = state.projects[0].id;
+  renderProjectList();
+  await loadQueues();
+}
+function renderProjectList(){
+  const el = document.getElementById('projectList');
+  el.innerHTML = state.projects.map(p => `<div class="nav-item ${p.id===state.currentProjectId?'active':''}" data-id="${p.id}">${p.name}</div>`).join('') || '<div class="empty">No projects yet</div>';
+  el.querySelectorAll('.nav-item').forEach(n => n.onclick = async () => {
+    state.currentProjectId = n.dataset.id; state.currentQueueId = null;
+    renderProjectList(); await loadQueues();
+  });
+}
+
+async function loadQueues(){
+  if(!state.currentProjectId){ state.queues=[]; renderQueueList(); renderMetricCards({}); return; }
+  const res = await api(`/projects/${state.currentProjectId}/queues`);
+  state.queues = res.data;
+  if(!state.currentQueueId && state.queues[0]) state.currentQueueId = state.queues[0].id;
+  renderQueueList();
+  await refreshCurrentQueue();
+  await loadMetrics();
+}
+function renderQueueList(){
+  const el = document.getElementById('queueList');
+  el.innerHTML = state.queues.map(q => `<div class="nav-item ${q.id===state.currentQueueId?'active':''}" data-id="${q.id}">${q.name}${q.is_paused?' ⏸':''} <span class="badge">${q.stats?q.stats.total_jobs:0}</span></div>`).join('') || '<div class="empty">No queues yet</div>';
+  el.querySelectorAll('.nav-item').forEach(n => n.onclick = async () => {
+    state.currentQueueId = n.dataset.id; renderQueueList(); await refreshCurrentQueue();
+  });
+}
+
+async function refreshCurrentQueue(){
+  if(!state.currentQueueId){ document.getElementById('jobsBody').innerHTML = '<tr><td colspan="7" class="empty">Select a queue to view jobs</td></tr>'; return; }
+  
+  const activeQ = state.queues.find(q => q.id === state.currentQueueId);
+  if (activeQ) {
+    const policy = activeQ.retry_policy || {};
+    document.getElementById('queueConfigSummary').innerHTML = `
+      <span>Priority: <strong>${activeQ.priority}</strong></span>
+      <span>Concurrency Limit: <strong>${activeQ.concurrency_limit}</strong></span>
+      <span>Rate Limit: <strong>${activeQ.rate_limit_per_min || 'None'} / min</strong></span>
+      <span>Retry Strategy: <strong>${policy.strategy || 'exponential'} (${policy.max_retries || 3} retries)</strong></span>
+      <span>Status: <strong style="color: ${activeQ.is_paused ? 'var(--red)' : 'var(--green)'}">${activeQ.is_paused ? 'PAUSED ⏸' : 'ACTIVE ⚡'}</strong></span>
+    `;
+    document.getElementById('pauseQueueBtn').textContent = activeQ.is_paused ? 'Resume queue' : 'Pause queue';
+    document.getElementById('pauseQueueBtn').style.borderColor = activeQ.is_paused ? 'var(--green)' : 'var(--red)';
+    document.getElementById('pauseQueueBtn').style.color = activeQ.is_paused ? 'var(--green)' : 'var(--red)';
+  } else {
+    document.getElementById('queueConfigSummary').innerHTML = '';
+  }
+
+  const status = document.getElementById('statusFilter').value;
+  const type = document.getElementById('typeFilter').value;
+  const qs = new URLSearchParams({ ...(status&&{status}), ...(type&&{type}), limit:50 });
+  const jobsRes = await api(`/queues/${state.currentQueueId}/jobs?${qs}`);
+  document.getElementById('queueSub').textContent = `${jobsRes.total} jobs`;
+  renderJobs(jobsRes.data);
+  const dlqRes = await api(`/queues/${state.currentQueueId}/dlq`);
+  renderDlq(dlqRes.data);
+}
+document.getElementById('statusFilter').onchange = refreshCurrentQueue;
+document.getElementById('typeFilter').onchange = refreshCurrentQueue;
+
+function renderJobs(jobs){
+  const body = document.getElementById('jobsBody');
+  if(!jobs.length){ body.innerHTML = '<tr><td colspan="7" class="empty">No jobs match this filter</td></tr>'; return; }
+  body.innerHTML = jobs.map(j => `<tr onclick="inspectJob('${j.id}')">
+    <td class="mono">${j.id.slice(0,8)}</td>
+    <td class="mono">${j.type}</td>
+    <td><span class="pill ${j.status}">${j.status}</span></td>
+    <td class="mono">${j.attempt_count}/${j.max_retries}</td>
+    <td class="mono">${j.priority}</td>
+    <td class="mono">${new Date(j.created_at).toLocaleTimeString()}</td>
+    <td style="color: var(--cyan); text-align: right; font-weight: 500;">Inspect →</td>
+  </tr>`).join('');
+}
+
+function renderDlq(entries){
+  const body = document.getElementById('dlqBody');
+  if(!entries.length){ body.innerHTML = '<tr><td colspan="5" class="empty">No dead-lettered jobs</td></tr>'; return; }
+  body.innerHTML = entries.map(e => `<tr>
+    <td class="mono" onclick="inspectJob('${e.job_id}')">${e.job_id.slice(0,8)}</td>
+    <td class="mono" onclick="inspectJob('${e.job_id}')">${e.attempt_count}</td>
+    <td onclick="inspectJob('${e.job_id}')">${(e.final_error||'').slice(0,60)}</td>
+    <td class="mono" onclick="inspectJob('${e.job_id}')">${new Date(e.moved_at).toLocaleTimeString()}</td>
+    <td style="text-align: right;"><span class="action-link" data-id="${e.id}">Retry</span></td>
+  </tr>`).join('');
+  body.querySelectorAll('.action-link').forEach(a => a.onclick = async (e) => {
+    e.stopPropagation(); // prevent inspecting job on retry click
+    await api(`/dlq/${a.dataset.id}/retry`, {method:'POST'});
+    await refreshCurrentQueue();
+  });
+}
+
+async function loadMetrics(){
+  const m = await api('/dashboard/metrics/overview');
+  renderMetricCards(m);
+  updateCharts(m);
+  const workers = await api('/workers');
+  renderWorkers(workers.data);
+}
+
+function renderMetricCards(m){
+  const s = m.jobs_by_status || {};
+  document.getElementById('metricCards').innerHTML = `
+    <div class="card glass"><div class="label">Total jobs</div><div class="value">${m.jobs_total??0}</div></div>
+    <div class="card glass cyan"><div class="label">Running</div><div class="value cyan">${s.running??0}</div></div>
+    <div class="card glass green"><div class="label">Completed</div><div class="value green">${s.completed??0}</div></div>
+    <div class="card glass red"><div class="label">Dead letter</div><div class="value red">${m.dead_letter_count??0}</div></div>`;
+}
+
+function renderWorkers(workers){
+  const el = document.getElementById('workerList');
+  if(!workers.length){ el.innerHTML = '<div class="empty">No workers registered</div>'; return; }
+  el.innerHTML = workers.map(w => `<div class="worker-row">
+    <span><span class="worker-dot ${w.status!=='online'?'offline':''}"></span>${w.hostname}</span>
+    <span class="mono" style="color:var(--muted);">${w.active_jobs} active</span></div>`).join('');
+}
+
+// ---------------- CHARTS VISUALIZATION (Chart.js) ----------------
+function updateCharts(metrics) {
+  // Line Chart for Hourly Throughput
+  const ctxT = document.getElementById('throughputChart');
+  if (!ctxT) return;
+  
+  const hours = [];
+  const counts = [];
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 3600 * 1000);
+    const key = d.toISOString().slice(0, 13);
+    hours.push(d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    counts.push(metrics.throughput_last_24h_by_hour?.[key] || 0);
+  }
+  
+  if (throughputChartInstance) {
+    throughputChartInstance.data.labels = hours;
+    throughputChartInstance.data.datasets[0].data = counts;
+    throughputChartInstance.update();
+  } else {
+    throughputChartInstance = new Chart(ctxT, {
+      type: 'line',
+      data: {
+        labels: hours,
+        datasets: [{
+          label: 'Throughput',
+          data: counts,
+          borderColor: '#00F5D4',
+          backgroundColor: 'rgba(0, 245, 212, 0.04)',
+          fill: true,
+          tension: 0.3,
+          borderWidth: 2,
+          pointRadius: 3,
+          pointHoverRadius: 6,
+          pointBackgroundColor: '#00F5D4'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { color: 'rgba(255,255,255,0.02)' }, ticks: { color: '#828A9C', font: { family: 'IBM Plex Mono', size: 9 } } },
+          y: { grid: { color: 'rgba(255,255,255,0.02)' }, ticks: { color: '#828A9C', font: { family: 'IBM Plex Mono', size: 9 } }, beginAtZero: true }
+        }
+      }
+    });
+  }
+
+  // Doughnut Chart for Job Distribution
+  const ctxD = document.getElementById('distributionChart');
+  if (!ctxD) return;
+  
+  const statusCounts = metrics.jobs_by_status || {};
+  const statuses = ['queued', 'scheduled', 'running', 'completed', 'dead_letter'];
+  const dataValues = statuses.map(s => statusCounts[s] || 0);
+  
+  if (distributionChartInstance) {
+    distributionChartInstance.data.datasets[0].data = dataValues;
+    distributionChartInstance.update();
+  } else {
+    distributionChartInstance = new Chart(ctxD, {
+      type: 'doughnut',
+      data: {
+        labels: statuses,
+        datasets: [{
+          data: dataValues,
+          backgroundColor: [
+            'rgba(156, 163, 175, 0.65)',
+            'rgba(140, 123, 255, 0.65)',
+            'rgba(0, 245, 212, 0.65)',
+            'rgba(0, 245, 155, 0.65)',
+            'rgba(255, 63, 108, 0.65)'
+          ],
+          borderColor: '#11141D',
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'right',
+            labels: { color: '#828A9C', font: { family: 'Inter', size: 10 } }
+          }
+        },
+        cutout: '65%'
+      }
+    });
+  }
+}
+
+// ---------------- LIVE FEED (WebSocket bonus) ----------------
+function connectWs(){
+  try{
+    const ws = new WebSocket(WS_URL);
+    ws.onopen = () => document.getElementById('connDot').classList.add('live');
+    ws.onclose = () => { document.getElementById('connDot').classList.remove('live'); setTimeout(connectWs, 3000); };
+    ws.onmessage = (msg) => {
+      const data = JSON.parse(msg.data);
+      if(data.event === 'connected') return;
+      pushFeed(data.event, data.job ? data.job.id.slice(0,8) : (data.worker_id||'').slice(0,8));
+      
+      if(data.job && data.job.queue_id === state.currentQueueId) refreshCurrentQueue();
+      if(['job:completed','job:dead_letter','job:claimed','worker:heartbeat','job:created'].includes(data.event)) loadMetrics();
+    };
+  }catch(e){ console.error(e); }
+}
+function pushFeed(event, ref){
+  const feed = document.getElementById('feed');
+  const div = document.createElement('div');
+  div.className = 'feed-item ' + event.replace(':','\\:');
+  div.innerHTML = `<span class="ev">${event}</span> · ${ref} · ${new Date().toLocaleTimeString()}`;
+  feed.prepend(div);
+  while(feed.children.length > 40) feed.removeChild(feed.lastChild);
+}
+
+// ---------------- BOOT ----------------
+async function boot(){
+  if(!state.token){ return; }
+  document.getElementById('auth').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  document.getElementById('userEmail').textContent = state.user?.email || '';
+  connectWs();
+  await loadProjects();
+  setInterval(() => { loadMetrics(); if(state.currentQueueId) refreshCurrentQueue(); }, 5000);
+}
+boot();
+</script>
+</body>
+</html>

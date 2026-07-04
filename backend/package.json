@@ -1,0 +1,23 @@
+{
+  "name": "distributed-job-scheduler",
+  "version": "1.0.0",
+  "description": "Distributed Job Scheduler - Codity.AI Intern Assignment",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "worker": "node src/worker.js",
+    "seed": "node src/seed.js",
+    "test": "node src/test.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "node-cron": "^3.0.3",
+    "express-rate-limit": "^7.4.0",
+    "ws": "^8.18.0",
+    "uuid": "^9.0.1",
+    "dotenv": "^16.4.5"
+  }
+}
